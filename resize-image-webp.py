@@ -3,6 +3,7 @@ import botocore
 import datetime
 import json
 import os
+import webp
 from io import BytesIO
 
 import boto3
@@ -20,13 +21,18 @@ def resize_image(bucket_name, key):
     OriginalKey = key.split('/')
     
     # If the URL is not formed correctly, then return None and show error
-    if len(OriginalKey) != 2:
-        print("URL: " + resized_image_url(key, os.environ['URL']))
-        print("ERROR: URL is not correctly formed.")
-        return None
-    else:
+    if len(OriginalKey) == 2:
         size = OriginalKey[0]
         image = OriginalKey[1]
+        ext = 'jpeg'
+    elif len(OriginalKey) == 3:
+        size = OriginalKey[0]
+        image = OriginalKey[1]
+        ext = OriginalKey[2]
+    else:
+        print("URL: " + resized_image_url(key, os.environ['url']))
+        print("ERROR: URL is not correctly formed.")
+        return None
 
     #Established a permanent width
     if size == "small":
@@ -40,7 +46,12 @@ def resize_image(bucket_name, key):
     else:
         print("ERROR. This size is not available.")
         return None
-
+        
+    # Check the extension
+    if ext != "webp" and ext != "jpeg":
+        print("ERROR. This extension is not available.")
+        return None
+    
     try:
         # Get the original image from S3 bucket
         s3 = boto3.resource('s3')
@@ -65,8 +76,9 @@ def resize_image(bucket_name, key):
         img = img.resize(
             (width, int(new_height)), PIL.Image.ANTIALIAS
         )
+        
         buffer = BytesIO()
-        img.save(buffer, 'JPEG', quality=95)
+        img.save(buffer, ext, quality=90)
         buffer.seek(0)
     
         resized_key="{key}".format(key=key)
@@ -76,15 +88,19 @@ def resize_image(bucket_name, key):
             bucket_name=bucket_name,
             key=resized_key,
         )
-        obj.put(Body=buffer, ContentType='image/jpeg')
+        
+        if ext == 'webp':
+            obj.put(Body=buffer, ContentType='image/webp')
+        else:
+            obj.put(Body=buffer, ContentType='image/jpeg')
         
         # Return resize image url
-        return resized_image_url(resized_key, os.environ["URL"])
-    
+        return resized_image_url(resized_key, os.environ['url'])
+        
     # Exception in case the image doesn't exists
     except botocore.exceptions.ClientError as error:
         if error.response['Error']['Code'] == "NoSuchKey":
-            print("URL: " + resized_image_url(key, os.environ["URL"]))
+            print("URL: " + resized_image_url(key, os.environ['url']))
             print("key: " + key)
             print("ERROR: The image not exists in the bucket S3.")
 
@@ -95,7 +111,7 @@ def main(event, context):
     key = event["queryStringParameters"]["key"]
     
     # Call the image resize function
-    result_url = resize_image(os.environ["BUCKET"], key)
+    result_url = resize_image(os.environ['bucket'], key)
 
     # If the image exits, show the image. If not, show error
     if result_url != None:
@@ -111,9 +127,9 @@ def main(event, context):
             }
         }
     else:
-        # Construct the response body --> no se muestra en pantalla
+        # Construct the response body
         transactionresponse = {}
-        transactionresponse['url'] = resized_image_url(key, os.environ['URL'])
+        transactionresponse['url'] = resized_image_url(key, os.environ['url'])
         transactionresponse['key'] = key
         transactionresponse["message"] = "ERROR: Something is not woking correctly. Please, read your logs file."
         
