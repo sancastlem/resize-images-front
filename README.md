@@ -11,7 +11,9 @@ The size must be:
 
 This function received a key, that must be formed like **key=size/image_name** (for both functions files) or **key=size/image_name/extension** where extension must be **webp** or **jpeg** (this key is only valid for the function *resize-image-webp.py*).
 
-The image is saved in a **bucket S3**, where is redirect to an API. You can create this API using the **API Gateway** service.
+The original image must be saved in a **bucket S3**, where is redirect to an API. You can create this API using the **API Gateway** service.
+
+When the process to resize the image has finished, the new image is saved in a folder (with the name of the size that was resized it) in the bucket S3.
 
 ## Use
 
